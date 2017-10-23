@@ -34,11 +34,11 @@ static Color colors[] = {
 #define BAR_BEGIN       '['
 #define BAR_END         ']'
 /* status bar (command line option -s) position */
-#define BAR_POS         BAR_TOP /* BAR_BOTTOM, BAR_OFF */
+#define BAR_POS         BAR_OFF /* BAR_BOTTOM, BAR_OFF */
 /* whether status bar should be hidden if only one client exists */
 #define BAR_AUTOHIDE    true
 /* master width factor [0.1 .. 0.9] */
-#define MFACT 0.5
+#define MFACT { 1, 1, 1, 1, 1, 1 }
 /* number of clients in master area */
 #define NMASTER 1
 /* scroll back buffer size in lines */
@@ -57,93 +57,59 @@ static Color colors[] = {
 const char tags[][8] = { "1", "2", "3", "4", "5" };
 
 #include "tile.c"
-#include "grid.c"
-#include "bstack.c"
+//#include "grid.c"
+//#include "bstack.c"
+//#include "tstack.c"
+//#include "vstack.c"
 #include "fullscreen.c"
 
 /* by default the first layout entry is used */
 static Layout layouts[] = {
-	{ "[]=", tile },
-	{ "+++", grid },
-	{ "TTT", bstack },
-	{ "[ ]", fullscreen },
+    { "[]=", tile },
+    { "[ ]", fullscreen },
 };
 
 #define MOD  CTRL('g')
-#define TAGKEYS(KEY,TAG) \
-	{ { MOD, 'v', KEY,     }, { view,           { tags[TAG] }               } }, \
-	{ { MOD, 't', KEY,     }, { tag,            { tags[TAG] }               } }, \
-	{ { MOD, 'V', KEY,     }, { toggleview,     { tags[TAG] }               } }, \
-	{ { MOD, 'T', KEY,     }, { toggletag,      { tags[TAG] }               } },
+#define TAGKEYS(FOCUS,SET,TAG) \
+    { { MOD, FOCUS, }, { focustagged, { TAG } } }, \
+    { { MOD, SET,   }, { tag,         { TAG } } },
 
 /* you can specifiy at most 3 arguments */
 static KeyBinding bindings[] = {
-	{ { MOD, 'c',          }, { create,         { NULL }                    } },
-	{ { MOD, 'C',          }, { create,         { NULL, NULL, "$CWD" }      } },
-	{ { MOD, 'x', 'x',     }, { killclient,     { NULL }                    } },
-	{ { MOD, 'j',          }, { focusnext,      { NULL }                    } },
-	{ { MOD, 'J',          }, { focusdown,      { NULL }                    } },
-	{ { MOD, 'K',          }, { focusup,        { NULL }                    } },
-	{ { MOD, 'H',          }, { focusleft,      { NULL }                    } },
-	{ { MOD, 'L',          }, { focusright,     { NULL }                    } },
-	{ { MOD, 'k',          }, { focusprev,      { NULL }                    } },
-	{ { MOD, 'f',          }, { setlayout,      { "[]=" }                   } },
-	{ { MOD, 'g',          }, { setlayout,      { "+++" }                   } },
-	{ { MOD, 'b',          }, { setlayout,      { "TTT" }                   } },
-	{ { MOD, 'm',          }, { setlayout,      { "[ ]" }                   } },
-	{ { MOD, ' ',          }, { setlayout,      { NULL }                    } },
-	{ { MOD, 'i',          }, { incnmaster,     { "+1" }                    } },
-	{ { MOD, 'd',          }, { incnmaster,     { "-1" }                    } },
-	{ { MOD, 'h',          }, { setmfact,       { "-0.05" }                 } },
-	{ { MOD, 'l',          }, { setmfact,       { "+0.05" }                 } },
-	{ { MOD, '.',          }, { toggleminimize, { NULL }                    } },
-	{ { MOD, 's',          }, { togglebar,      { NULL }                    } },
-	{ { MOD, 'S',          }, { togglebarpos,   { NULL }                    } },
-	{ { MOD, 'M',          }, { togglemouse,    { NULL }                    } },
-	{ { MOD, '\n',         }, { zoom ,          { NULL }                    } },
-	{ { MOD, '\r',         }, { zoom ,          { NULL }                    } },
-	{ { MOD, '1',          }, { focusn,         { "1" }                     } },
-	{ { MOD, '2',          }, { focusn,         { "2" }                     } },
-	{ { MOD, '3',          }, { focusn,         { "3" }                     } },
-	{ { MOD, '4',          }, { focusn,         { "4" }                     } },
-	{ { MOD, '5',          }, { focusn,         { "5" }                     } },
-	{ { MOD, '6',          }, { focusn,         { "6" }                     } },
-	{ { MOD, '7',          }, { focusn,         { "7" }                     } },
-	{ { MOD, '8',          }, { focusn,         { "8" }                     } },
-	{ { MOD, '9',          }, { focusn,         { "9" }                     } },
-	{ { MOD, '\t',         }, { focuslast,      { NULL }                    } },
-	{ { MOD, 'q', 'q',     }, { quit,           { NULL }                    } },
-	{ { MOD, 'a',          }, { togglerunall,   { NULL }                    } },
-	{ { MOD, CTRL('L'),    }, { redraw,         { NULL }                    } },
-	{ { MOD, 'r',          }, { redraw,         { NULL }                    } },
-	{ { MOD, 'e',          }, { copymode,       { "dvtm-editor" }           } },
-	{ { MOD, 'E',          }, { copymode,       { "dvtm-pager" }            } },
-	{ { MOD, '/',          }, { copymode,       { "dvtm-pager", "/" }       } },
-	{ { MOD, 'p',          }, { paste,          { NULL }                    } },
-	{ { MOD, KEY_PPAGE,    }, { scrollback,     { "-1" }                    } },
-	{ { MOD, KEY_NPAGE,    }, { scrollback,     { "1"  }                    } },
-	{ { MOD, '?',          }, { create,         { "man dvtm", "dvtm help" } } },
-	{ { MOD, MOD,          }, { send,           { (const char []){MOD, 0} } } },
-	{ { KEY_SPREVIOUS,     }, { scrollback,     { "-1" }                    } },
-	{ { KEY_SNEXT,         }, { scrollback,     { "1"  }                    } },
-	{ { MOD, '0',          }, { view,           { NULL }                    } },
-	{ { MOD, KEY_F(1),     }, { view,           { tags[0] }                 } },
-	{ { MOD, KEY_F(2),     }, { view,           { tags[1] }                 } },
-	{ { MOD, KEY_F(3),     }, { view,           { tags[2] }                 } },
-	{ { MOD, KEY_F(4),     }, { view,           { tags[3] }                 } },
-	{ { MOD, KEY_F(5),     }, { view,           { tags[4] }                 } },
-	{ { MOD, 'v', '0'      }, { view,           { NULL }                    } },
-	{ { MOD, 'v', '\t',    }, { viewprevtag,    { NULL }                    } },
-	{ { MOD, 't', '0'      }, { tag,            { NULL }                    } },
-	TAGKEYS( '1',                              0)
-	TAGKEYS( '2',                              1)
-	TAGKEYS( '3',                              2)
-	TAGKEYS( '4',                              3)
-	TAGKEYS( '5',                              4)
+    { { MOD, CTRL('c'), }, { create,         { NULL }                    } },
+    { { MOD, 'c',       }, { create,         { NULL, NULL, "$CWD" }      } },
+    { { MOD, CTRL('q'), }, { killclient,     { NULL }                    } },
+    { { MOD, CTRL('t'), }, { focusdown,      { NULL }                    } },
+    { { MOD, CTRL('n'), }, { focusup,        { NULL }                    } },
+    { { MOD, CTRL('h'), }, { focusleft,      { NULL }                    } },
+    { { MOD, CTRL('s'), }, { focusright,     { NULL }                    } },
+    { { MOD, CTRL('b'), }, { setlayout,      { "[]=" }                   } },
+    { { MOD, CTRL('z'), }, { setlayout,      { "[ ]" }                   } },
+    { { MOD, ' ',       }, { setlayout,      { NULL }                    } },
+    { { MOD, ',',       }, { setmfact,       { "-0.1" }                  } },
+    { { MOD, '.',       }, { setmfact,       { "+0.1" }                  } },
+    { { MOD, '-',       }, { focuslast,      { NULL }                    } },
+    { { MOD, 'q', 'q',  }, { quit,           { NULL }                    } },
+    { { MOD, CTRL('a')  }, { togglerunall,   { NULL }                    } },
+    { { MOD, CTRL('l'), }, { redraw,         { NULL }                    } },
+    { { MOD, 'r',       }, { redraw,         { NULL }                    } },
+    { { MOD, 'y',       }, { copymode,       { "dvtm-editor" }           } },
+    { { MOD, 'l',       }, { copymode,       { "dvtm-pager" }            } },
+    { { MOD, '/',       }, { copymode,       { "dvtm-pager", "/" }       } },
+    { { MOD, CTRL('p'), }, { paste,          { NULL }                    } },
+    { { MOD, KEY_PPAGE, }, { scrollback,     { "-1" }                    } },
+    { { MOD, KEY_NPAGE, }, { scrollback,     { "1"  }                    } },
+    { { MOD, MOD,       }, { send,           { (const char []){MOD, 0} } } },
+    { { KEY_SPREVIOUS,  }, { scrollback,     { "-1" }                    } },
+    { { KEY_SNEXT,      }, { scrollback,     { "1"  }                    } },
+    TAGKEYS( CTRL('e'), 'e', tags[0] )
+    TAGKEYS( CTRL('o'), 'o', tags[1] )
+    TAGKEYS( CTRL('u'), 'u', tags[2] )
+    TAGKEYS( CTRL('r'), 'r', tags[3] )
 };
 
 static const ColorRule colorrules[] = {
-	{ "", A_NORMAL, &colors[DEFAULT] }, /* default */
+    { "", A_NORMAL, &colors[DEFAULT] }, /* default */
 };
 
 /* possible values for the mouse buttons are listed below:
@@ -183,27 +149,51 @@ static const ColorRule colorrules[] = {
 
 #ifdef CONFIG_MOUSE
 static Button buttons[] = {
-	{ BUTTON1_CLICKED,        { mouse_focus,      { NULL  } } },
-	{ BUTTON1_DOUBLE_CLICKED, { mouse_fullscreen, { "[ ]" } } },
-	{ BUTTON2_CLICKED,        { mouse_zoom,       { NULL  } } },
-	{ BUTTON3_CLICKED,        { mouse_minimize,   { NULL  } } },
+    { BUTTON1_CLICKED,        { mouse_focus,      { NULL  } } },
+    { BUTTON1_DOUBLE_CLICKED, { mouse_fullscreen, { "[ ]" } } },
+    { BUTTON2_CLICKED,        { mouse_zoom,       { NULL  } } },
+    { BUTTON3_CLICKED,        { mouse_minimize,   { NULL  } } },
 };
 #endif /* CONFIG_MOUSE */
 
 static Cmd commands[] = {
-	/* create [cmd]: create a new window, run `cmd` in the shell if specified */
-	{ "create", { create,	{ NULL } } },
-	/* focus <win_id>: focus the window whose `DVTM_WINDOW_ID` is `win_id` */
-	{ "focus",  { focusid,	{ NULL } } },
-	/* tag <win_id> <tag> [tag ...]: add +tag, remove -tag or set tag of the window with the given identifier */
-	{ "tag",    { tagid,	{ NULL } } },
+    { "copymode",       { copymode,       { NULL } } },
+    { "create",         { create,         { NULL } } },
+    { "focusdown",      { focusdown,      { NULL } } },
+    { "focuslast",      { focuslast,      { NULL } } },
+    { "focusleft",      { focusleft,      { NULL } } },
+    { "focusnext",      { focusnext,      { NULL } } },
+    { "focusn",         { focusn,         { NULL } } },
+    { "focusprev",      { focusprev,      { NULL } } },
+    { "focusright",     { focusright,     { NULL } } },
+    { "focusup",        { focusup,        { NULL } } },
+    { "focustagged",    { focustagged,    { NULL } } },
+    { "incnmaster",     { incnmaster,     { NULL } } },
+    { "killclient",     { killclient,     { NULL } } },
+    { "paste",          { paste,          { NULL } } },
+    { "quit",           { quit,           { NULL } } },
+    { "redraw",         { redraw,         { NULL } } },
+    { "scrollback",     { scrollback,     { NULL } } },
+    { "send",           { send,           { NULL } } },
+    { "replsend",       { replsend,       { NULL } } },
+    { "setlayout",      { setlayout,      { NULL } } },
+    { "setmfact",       { setmfact,       { NULL } } },
+    { "tag",            { tag,            { NULL } } },
+    { "togglebarpos",   { togglebarpos,   { NULL } } },
+    { "togglebar",      { togglebar,      { NULL } } },
+    { "toggleminimize", { toggleminimize, { NULL } } },
+    { "togglemouse",    { togglemouse,    { NULL } } },
+    { "togglerunall",   { togglerunall,   { NULL } } },
+    { "viewprevtag",    { viewprevtag,    { NULL } } },
+    { "view",           { view,           { NULL } } },
+    { "zoom",           { zoom,           { NULL } } },
 };
 
 /* gets executed when dvtm is started */
 static Action actions[] = {
-	{ create, { NULL } },
+    { create, { NULL } },
 };
 
 static char const * const keytable[] = {
-	/* add your custom key escape sequences */
+    /* add your custom key escape sequences */
 };

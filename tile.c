@@ -1,49 +1,95 @@
+
 static void tile(void)
 {
-	unsigned int i, n, nx, ny, nw, nh, m, mw, mh, th;
+	//unsigned int i, n, nx, ny, nw, nh, m, mw, mh, th;
 	Client *c;
 
-	for (n = 0, c = nextvisible(clients); c; c = nextvisible(c->next))
-		if (!c->minimized)
-			n++;
+	unsigned int slack, used, sections, xo;
+	unsigned int n[T];
+	unsigned int i[T];
+	unsigned int h0[T];
+	unsigned int h[T];
+	unsigned int w[T];
+	unsigned int x[T];
+	unsigned int y[T];
+	unsigned int t;
 
-	m  = MAX(1, MIN(n, screen.nmaster));
-	mw = n == m ? waw : screen.mfact * waw;
-	mh = wah / m;
-	th = n == m ? 0 : wah / (n - m);
-	nx = wax;
-	ny = way;
+	float m;
 
-	for (i = 0, c = nextvisible(clients); c; c = nextvisible(c->next)) {
-		if (c->minimized)
-			continue;
-		if (i < m) {	/* master */
-			nw = mw;
-			nh = (i < m - 1) ? mh : (way + wah) - ny;
-		} else {	/* tile window */
-			if (i == m) {
-				ny = way;
-				nx += mw;
-				mvvline(ny, nx, ACS_VLINE, wah);
-				mvaddch(ny, nx, ACS_TTEE);
-				nx++;
-				nw = waw - mw -1;
-			}
-			nh = (i < n - 1) ? th : (way + wah) - ny;
-			if (i > m)
-				mvaddch(ny, nx - 1, ACS_LTEE);
-		}
-		resize(c, nx, ny, nw, nh);
-		ny += nh;
-		i++;
+	for (t = 0; t < T; ++t) {
+		n[t] = 0;
 	}
 
-	/* Fill in nmaster intersections */
-	if (n > m) {
-		ny = way + mh;
-		for (i = 1; i < m; i++) {
-			mvaddch(ny, nx - 1, ((ny - 1) % th ? ACS_RTEE : ACS_PLUS));
-			ny += mh;
+	for (c = nextvisible(clients); c; c = nextvisible(c->next)) {
+		if (!c->minimized) {
+			n[bin(c->tags)]++;
 		}
+	}
+
+	sections = 0;
+	m = 0.0;
+	for (t = 0; t < T; ++t) {
+		sections += n[t] > 0;
+		if (n[t] > 0) {
+			m += screen.mfact[t];
+		}
+	}
+
+	if (sections == 0) {
+		// no visible windows
+		return;
+	}
+
+	used = 0;
+	for (t = 0; t < T; ++t) {
+		w[t] = n[t] ? (int)((float)(waw - sections + 1) * screen.mfact[t] / m) - 1 : 0;
+		used += w[t];
+	}
+
+	slack = waw - sections + 1 - used;
+
+	// distribute the slack
+	t = slack > 0;
+	while (slack != 0) {
+		if (n[t] && slack > 0) {
+			w[t]++;
+			slack--;
+		} else if (n[t] && w[t] > 0 && slack < 0) {
+			w[t]--;
+			slack++;
+		}
+		t++;
+		if (t > T) {
+			t = 0;
+		}
+	}
+
+	xo = 0;
+
+	for (t = 0; t < T; ++t) {
+		if (n[t]) {
+			x[t] = xo;
+			xo += w[t] + 1;
+			if (xo - 1 < waw) {
+				mvvline(way, xo - 1, ACS_VLINE, wah);
+			}
+		}
+	}
+
+	for (t = 0; t < T; ++t) {
+		if (n[t]) {
+			h[t] = wah / n[t];
+			h0[t] = wah - h[t] * (n[t] - 1);
+			y[t] = 0;
+			i[t] = 0;
+		}
+	}
+
+	for (c = nextvisible(clients); c; c = nextvisible(c->next)) {
+		if (c->minimized)
+			continue;
+		t = bin(c->tags);
+		resize(c, x[t], way + h[t] * i[t], w[t], h[t]);
+		i[t]++;
 	}
 }

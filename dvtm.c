@@ -47,12 +47,12 @@ int ESCDELAY;
 #endif
 
 typedef struct {
-	float mfact;
 	unsigned int nmaster;
 	int history;
 	int w;
 	int h;
 	volatile sig_atomic_t need_resize;
+	float mfact[];
 } Screen;
 
 typedef struct {
@@ -177,6 +177,9 @@ typedef struct {
  #define debug eprint
 #endif
 
+#define T LENGTH(tags)
+static unsigned int bin(int t);
+
 /* commands for use by keybindings */
 static void create(const char *args[]);
 static void copymode(const char *args[]);
@@ -191,12 +194,14 @@ static void focusup(const char *args[]);
 static void focusdown(const char *args[]);
 static void focusleft(const char *args[]);
 static void focusright(const char *args[]);
+static void focustagged(const char *args[]);
 static void killclient(const char *args[]);
 static void paste(const char *args[]);
 static void quit(const char *args[]);
 static void redraw(const char *args[]);
 static void scrollback(const char *args[]);
 static void send(const char *args[]);
+static void replsend(const char *args[]);
 static void setlayout(const char *args[]);
 static void incnmaster(const char *args[]);
 static void setmfact(const char *args[]);
@@ -273,7 +278,8 @@ isarrange(void (*func)()) {
 
 static bool
 isvisible(Client *c) {
-	return c->tags & tagset[seltags];
+	return 1;
+	// c->tags & tagset[seltags];
 }
 
 static bool
@@ -388,7 +394,8 @@ drawbar(void) {
 
 static int
 show_border(void) {
-	return (bar.pos != BAR_OFF) || (clients && clients->next);
+	return 0;
+	//(bar.pos != BAR_OFF) || (clients && clients->next);
 }
 
 static void
@@ -773,6 +780,17 @@ keybinding(KeyCombo keys, unsigned int keycount) {
 }
 
 static unsigned int
+bin(int t) {
+	unsigned int i;
+	for (i = 0; i < T; i++) {
+		if (t & (1 << i)) {
+			return i+1;
+		}
+	}
+	return 0;
+}
+
+static unsigned int
 bitoftag(const char *tag) {
 	unsigned int i;
 	if (!tag)
@@ -1049,7 +1067,7 @@ create(const char *args[]) {
 	Client *c = calloc(1, sizeof(Client));
 	if (!c)
 		return;
-	c->tags = tagset[seltags];
+	c->tags = 2; // tagset[seltags];
 	c->id = ++cmdfifo.id;
 	snprintf(buf, sizeof buf, "%d", c->id);
 
@@ -1187,6 +1205,19 @@ focusnext(const char *args[]) {
 	for (c = sel->next; c && !isvisible(c); c = c->next);
 	if (!c)
 		for (c = clients; c && !isvisible(c); c = c->next);
+	if (c)
+		focus(c);
+}
+
+static void
+focustagged(const char *args[]) {
+	unsigned int t = bitoftag(args[0]) & TAGMASK;
+	Client *c;
+	if (!sel)
+		return;
+	for (c = sel->next; c && !(t & c->tags); c = c->next);
+	if (!c)
+		for (c = clients; c && !(t & c->tags); c = c->next);
 	if (c)
 		focus(c);
 }
@@ -1331,6 +1362,16 @@ scrollback(const char *args[]) {
 }
 
 static void
+replsend(const char *args[]) {
+	if (sel && args && args[0]) {
+		const char *focusargs[] = { tags[3] };
+		focustagged(focusargs);
+		vt_write(sel->term, args[0], strlen(args[0]));
+		focuslast(NULL);
+	}
+}
+
+static void
 send(const char *args[]) {
 	if (sel && args && args[0])
 		vt_write(sel->term, args[0], strlen(args[0]));
@@ -1358,7 +1399,7 @@ static void
 incnmaster(const char *args[]) {
 	int delta;
 
-	if (isarrange(fullscreen) || isarrange(grid))
+	if (isarrange(fullscreen))
 		return;
 	/* arg handling, manipulate nmaster */
 	if (args[0] == NULL) {
@@ -1377,21 +1418,26 @@ incnmaster(const char *args[]) {
 static void
 setmfact(const char *args[]) {
 	float delta;
+	unsigned int t;
+	if (!sel)
+		return;
 
-	if (isarrange(fullscreen) || isarrange(grid))
+	t = bin(sel->tags);
+
+	if (isarrange(fullscreen))
 		return;
 	/* arg handling, manipulate mfact */
 	if (args[0] == NULL) {
-		screen.mfact = MFACT;
+		for (t = 0; t < T; t++) {
+			screen.mfact[0] = 1;
+		}
 	} else if (sscanf(args[0], "%f", &delta) == 1) {
 		if (args[0][0] == '+' || args[0][0] == '-')
-			screen.mfact += delta;
+			screen.mfact[t] += delta;
 		else
-			screen.mfact = delta;
-		if (screen.mfact < 0.1)
-			screen.mfact = 0.1;
-		else if (screen.mfact > 0.9)
-			screen.mfact = 0.9;
+			screen.mfact[t] = delta;
+		if (screen.mfact[t] < 0.1)
+			screen.mfact[t] = 0.1;
 	}
 	arrange();
 }
@@ -1749,7 +1795,7 @@ parse_args(int argc, char *argv[]) {
 	if (name && (name = strrchr(name, '/')))
 		dvtm_name = name + 1;
 	if (!getenv("ESCDELAY"))
-		set_escdelay(100);
+		set_escdelay(0);
 	for (int arg = 1; arg < argc; arg++) {
 		if (argv[arg][0] != '-') {
 			const char *args[] = { argv[arg], NULL, NULL };
